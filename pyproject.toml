@@ -1,0 +1,10 @@
+[project]
+name = "tomi-sensei"
+version = "0.1.0"
+description = "AI Wealth advisor "
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "google-adk>=1.27.2",
+    "yfinance>=0.2.0",
+]
