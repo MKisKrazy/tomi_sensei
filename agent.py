@@ -1,7 +1,8 @@
 from google.adk.agents import LlmAgent , SequentialAgent
-from .tools.stock_tools import fetch_stock_price, get_company_info,convert_usd_to_inr
-from .callbacks.guardrails import validate_ticker_before_tool,add_disclaimer_after_model,audit_log_before_agent
-
+from .tools.stock_tools import fetch_stock_price, get_company_info,convert_usd_to_inr,save_user_preferences
+from .callbacks.guardrails import validate_ticker_before_tool,add_disclaimer_after_model,audit_log_before_agent,save_to_memory_after_agent
+from google.adk.tools.load_memory_tool import LoadMemoryTool
+from .tools.calc_tools import calculate_compound_returns,calculate_portfolio_allocation
 
 # Stock Analyst
 stock_analyst = LlmAgent(
@@ -27,7 +28,7 @@ tools=[fetch_stock_price,get_company_info,convert_usd_to_inr] ,
 before_tool_callback=[validate_ticker_before_tool]
 )
 
-# ── Portfolio Advisor ─────────────────────────────────
+# Portfolio Advisor 
 # note: model is the V1 default — V2 overrides via model_switcher_callback
 portfolio_advisor = LlmAgent(
     name="PortfolioAdvisor",
@@ -48,7 +49,7 @@ Guidelines by risk tolerance:
 # - calculate_portfolio_allocation: to compute dollar amounts for each position
 
 Always explain your reasoning.""",
-
+tools=[calculate_portfolio_allocation,calculate_compound_returns],
 )
 
 #  Report Generator 
@@ -98,5 +99,7 @@ Be conversational, warm, and professional.
 Always include: "This is AI-generated analysis, not financial advice." """,
 sub_agents=[analysis_pipeline],
 before_agent_callback=[audit_log_before_agent],
-after_model_callback=[add_disclaimer_after_model]
+after_model_callback=[add_disclaimer_after_model],
+tools=[save_user_preferences,LoadMemoryTool()],
+after_agent_callback=[save_to_memory_after_agent]
 )
