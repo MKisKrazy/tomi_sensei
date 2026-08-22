@@ -3,6 +3,8 @@ from .tools.stock_tools import fetch_stock_price, get_company_info,convert_usd_t
 from .callbacks.guardrails import validate_ticker_before_tool,add_disclaimer_after_model,audit_log_before_agent,save_to_memory_after_agent
 from google.adk.tools.load_memory_tool import LoadMemoryTool
 from .tools.calc_tools import calculate_compound_returns,calculate_portfolio_allocation
+from .tools.report_tools import save_portfolio_report
+from google.genai import types
 
 # Stock Analyst
 stock_analyst = LlmAgent(
@@ -67,6 +69,7 @@ Create a comprehensive portfolio report including:
 5. Save the report as a versioned artifact using save_portfolio_report tool
 
 Format your output in clean Markdown.""",
+tools=[save_portfolio_report],
 
 )
 
@@ -101,5 +104,11 @@ sub_agents=[analysis_pipeline],
 before_agent_callback=[audit_log_before_agent],
 after_model_callback=[add_disclaimer_after_model],
 tools=[save_user_preferences,LoadMemoryTool()],
-after_agent_callback=[save_to_memory_after_agent]
+after_agent_callback=[save_to_memory_after_agent],
+    generate_content_config=types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(
+            include_thoughts=True,
+            thinking_budget=2048,
+        )
+    ),
 )
