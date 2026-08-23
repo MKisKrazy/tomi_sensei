@@ -1,4 +1,4 @@
-from google.adk.agents import LlmAgent , SequentialAgent
+from google.adk.agents import LlmAgent , SequentialAgent , ParallelAgent,LoopAgent
 from .tools.stock_tools import fetch_stock_price, get_company_info,convert_usd_to_inr,save_user_preferences
 from .callbacks.guardrails import validate_ticker_before_tool,add_disclaimer_after_model,audit_log_before_agent,save_to_memory_after_agent
 from google.adk.tools.load_memory_tool import LoadMemoryTool
@@ -73,6 +73,82 @@ tools=[save_portfolio_report],
 
 )
 
+# --- Parallel Stock Analysis ---
+parallel_analyst_1 = LlmAgent(
+    name="ParallelAnalyst1",
+    model="gemini-3.5-flash-lite",
+    description="Analyzes the first stock in a parallel batch.",
+    instruction="""You are a parallel stock analyst.
+Analyze the stock assigned to you using fetch_stock_price and get_company_info.
+Focus on the FIRST stock mentioned in the conversation.""",
+    tools=[fetch_stock_price, get_company_info],
+    before_tool_callback=validate_ticker_before_tool,
+)
+
+parallel_analyst_2 = LlmAgent(
+    name="ParallelAnalyst2",
+    model="gemini-3.5-flash-lite",
+    description="Analyzes the second stock in a parallel batch.",
+    instruction="""You are a parallel stock analyst.
+Focus on the SECOND stock mentioned in the conversation.""",
+    tools=[fetch_stock_price, get_company_info],
+    before_tool_callback=validate_ticker_before_tool,
+)
+
+parallel_analyst_3 = LlmAgent(
+    name="ParallelAnalyst3",
+    model="gemini-3.5-flash-lite",
+    description="Analyzes the third stock in a parallel batch.",
+    instruction="""You are a parallel stock analyst.
+Focus on the THIRD stock mentioned in the conversation.""",
+    tools=[fetch_stock_price, get_company_info],
+    before_tool_callback=validate_ticker_before_tool,
+)
+
+parallel_stock_analysis = ParallelAgent(
+    name="ParallelStockAnalysis",
+    description="Analyzes multiple stocks simultaneously for faster results.",
+    sub_agents=[parallel_analyst_1, parallel_analyst_2, parallel_analyst_3],
+)
+
+
+# --- Portfolio Optimizer Loop ---
+allocation_proposer = LlmAgent(
+    name="AllocationProposer",
+    model="gemini-3.5-flash-lite",
+    description="Proposes portfolio allocation percentages.",
+    instruction="""You are the Allocation Proposer.
+Based on the stock analyses and the user's risk_tolerance from state,
+propose a portfolio allocation.
+
+Format: TICKER: X% ($Y) for each position.
+If RiskChecker asked for adjustments, incorporate their feedback.
+Use calculate_portfolio_allocation to compute rupees amounts.""",
+    tools=[calculate_portfolio_allocation],
+)
+
+risk_checker = LlmAgent(
+    name="RiskChecker",
+    model="gemini-3.5-flash-lite",
+    description="Validates allocation matches user risk tolerance.",
+    instruction="""You are the Risk Checker. Evaluate the allocation against risk_tolerance.
+
+Risk guidelines:
+- Conservative: max 40% stocks, prefer ETFs/bonds
+- Moderate: 50-70% stocks, 30-50% bonds
+- Aggressive: up to 90% stocks, 10% bonds
+
+If it matches: "APPROVED: Allocation matches [risk_tolerance] profile."
+If not: "NEEDS ADJUSTMENT: [reason]" with specific suggestions.""",
+)
+
+portfolio_optimizer = LoopAgent(
+    name="PortfolioOptimizer",
+    description="Iteratively refines allocation until it matches risk tolerance.",
+    sub_agents=[allocation_proposer, risk_checker],
+    max_iterations=3,
+)
+
 
 #Analysis Pipeline
 analysis_pipeline = SequentialAgent (
@@ -90,6 +166,8 @@ root_agent = LlmAgent(
 You help users analyze stocks and build investment portfolios.
 You have a team of specialist agents to help you:
 - **AnalysisPipeline**: Full sequential flow (analyze → advise → report)
+- **ParallelStockAnalysis**: Analyze multiple stocks simultaneously
+- **PortfolioOptimizer**: Iteratively refine portfolio allocation to match risk tolerance
 
 ## Conversation Flow
 1. Greet the user warmly
@@ -97,10 +175,12 @@ You have a team of specialist agents to help you:
 3. Ask about their investment goals, budget, risk tolerance
 4. Save Preferences using save_user_preferences tool once you have the info
 5. When they want analysis, transfer to AnalysisPipeline
+6. If they want to analyze multiple stocks, use ParallelStockAnalysis
+7. If they want to refine their portfolio, use PortfolioOptimizer
 
 Be conversational, warm, and professional.
 Always include: "This is AI-generated analysis, not financial advice." """,
-sub_agents=[analysis_pipeline],
+sub_agents=[analysis_pipeline,parallel_stock_analysis,portfolio_optimizer],
 before_agent_callback=[audit_log_before_agent],
 after_model_callback=[add_disclaimer_after_model],
 tools=[save_user_preferences,LoadMemoryTool()],

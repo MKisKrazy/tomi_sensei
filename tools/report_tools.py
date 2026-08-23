@@ -45,7 +45,7 @@ class PortfolioReportPDF(FPDF):
         self.cell(
             0,
             12,
-            "  WealthPilot - AI Wealth Advisor",
+            "  Tomi Sensei - AI Wealth Advisor",
             new_x="LMARGIN",
             new_y="NEXT",
             fill=True,
